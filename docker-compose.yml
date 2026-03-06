@@ -1,0 +1,11 @@
+services:
+	baza-danych:
+		image: mcr.microsoft.com/mssql/server:2022-latest
+		container_name: kawiarnia-sql-db
+		ports:
+			- "1433:1433:
+		env_file:
+			- secret.env
+		environment:
+			- ACCEPT_EULA=Y
+			- MSSQL_SA_PASSWORD=${DB_PASSWORD}
