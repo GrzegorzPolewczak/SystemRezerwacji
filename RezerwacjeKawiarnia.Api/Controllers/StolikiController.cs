@@ -20,12 +20,63 @@ namespace RezerwacjeKawiarnia.Api.Controllers
             return Ok(stoliki);
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Stolik>> PobierzStolik(int id)
+        {
+            var stolik = await _context.Stoliki.FindAsync(id);
+            if (stolik == null)
+            {
+                return NotFound($"Nie znaleziono stolika o ID {id}.");
+            }
+
+            return Ok(stolik);
+        }
+
         [HttpPost]
-        public async Task<ActionResult> DodajStolik(Stolik nowyStolik)
+        public async Task<ActionResult<Stolik>> DodajStolik(Stolik nowyStolik)
         {
             _context.Stoliki.Add(nowyStolik);
             await _context.SaveChangesAsync();
-            return Ok(nowyStolik);
+            return CreatedAtAction(nameof(PobierzStolik), new { id = nowyStolik.Id }, nowyStolik);
         }
+
+        [HttpPut("{id}")]
+        public async Task<ActionResult<Stolik>> EdytujStolik(int id, Stolik zaktualizowanyStolik)
+        {
+            if (id != zaktualizowanyStolik.Id) 
+            {
+                return BadRequest("ID wybranego stolika, nie są zgodne z ID zaktualizowanego stolika.");
+            }
+
+            var stolik = await _context.Stoliki.FindAsync(id);
+            if (stolik == null)
+            {
+                return NotFound($"Nie znaleziono stolika o ID {id}.");
+            }
+
+            stolik.Numer = zaktualizowanyStolik.Numer;
+            stolik.LiczbaMiejsc = zaktualizowanyStolik.LiczbaMiejsc;
+            stolik.CzyZarezerwowany = zaktualizowanyStolik.CzyZarezerwowany;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(stolik);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> UsunStolik(int id)
+        {
+            var stolik = await _context.Stoliki.FindAsync(id);
+            if(stolik == null)
+            {
+                return NotFound($"Nie znaleziono stolika o ID {id}.");
+            }
+
+            _context.Stoliki.Remove(stolik);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
     }
 }
