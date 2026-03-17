@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RezerwacjeKawiarnia.Api.Data;
+using RezerwacjeKawiarnia.Api.DTOs;
 using RezerwacjeKawiarnia.Api.Entities;
 
 namespace RezerwacjeKawiarnia.Api.Controllers
@@ -15,15 +16,33 @@ namespace RezerwacjeKawiarnia.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Stolik>>> PobierzWszystkie() {
-            var stoliki = await _context.Stoliki.ToListAsync();
+        public async Task<ActionResult<IEnumerable<StolikDto>>> PobierzWszystkie() {
+            var stoliki = await _context.Stoliki
+                .Select(s => new StolikDto
+                {
+                    Id = s.Id,
+                    Numer = s.Numer,
+                    LiczbaMiejsc = s.LiczbaMiejsc,
+                    CzyZarezerwowany = s.CzyZarezerwowany
+                })
+                .ToListAsync();
+
             return Ok(stoliki);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Stolik>> PobierzStolik(int id)
+        public async Task<ActionResult<StolikDto>> PobierzStolik(int id)
         {
-            var stolik = await _context.Stoliki.FindAsync(id);
+            var stolik = await _context.Stoliki
+                .Select(s => new StolikDto
+                {
+                    Id = s.Id,
+                    Numer = s.Numer,
+                    LiczbaMiejsc = s.LiczbaMiejsc,
+                    CzyZarezerwowany = s.CzyZarezerwowany
+                })
+                .SingleOrDefaultAsync(s => s.Id == id);
+
             if (stolik == null)
             {
                 return NotFound($"Nie znaleziono stolika o ID {id}.");
@@ -33,34 +52,45 @@ namespace RezerwacjeKawiarnia.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Stolik>> DodajStolik(Stolik nowyStolik)
+        public async Task<ActionResult<StolikDto>> DodajStolik(DodajStolikDto dto)
         {
+            var nowyStolik = new Stolik
+            {
+                Numer = dto.Numer,
+                LiczbaMiejsc = dto.LiczbaMiejsc,
+                CzyZarezerwowany = dto.CzyZarezerwowany
+            };
+
             _context.Stoliki.Add(nowyStolik);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(PobierzStolik), new { id = nowyStolik.Id }, nowyStolik);
+
+            var wyjsciowyStolik = new StolikDto
+            {
+                Id = nowyStolik.Id,
+                Numer = nowyStolik.Numer,
+                LiczbaMiejsc = nowyStolik.LiczbaMiejsc,
+                CzyZarezerwowany = nowyStolik.CzyZarezerwowany
+            };
+
+            return CreatedAtAction(nameof(PobierzStolik), new { id = nowyStolik.Id }, wyjsciowyStolik);
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<Stolik>> EdytujStolik(int id, Stolik zaktualizowanyStolik)
+        public async Task<IActionResult> EdytujStolik(int id, EdytujStolikDto dto)
         {
-            if (id != zaktualizowanyStolik.Id) 
-            {
-                return BadRequest("ID wybranego stolika, nie są zgodne z ID zaktualizowanego stolika.");
-            }
-
             var stolik = await _context.Stoliki.FindAsync(id);
             if (stolik == null)
             {
                 return NotFound($"Nie znaleziono stolika o ID {id}.");
             }
 
-            stolik.Numer = zaktualizowanyStolik.Numer;
-            stolik.LiczbaMiejsc = zaktualizowanyStolik.LiczbaMiejsc;
-            stolik.CzyZarezerwowany = zaktualizowanyStolik.CzyZarezerwowany;
+            stolik.Numer = dto.Numer;
+            stolik.LiczbaMiejsc = dto.LiczbaMiejsc;
+            stolik.CzyZarezerwowany = dto.CzyZarezerwowany;
 
             await _context.SaveChangesAsync();
 
-            return Ok(stolik);
+            return NoContent();
         }
 
         [HttpDelete("{id}")]

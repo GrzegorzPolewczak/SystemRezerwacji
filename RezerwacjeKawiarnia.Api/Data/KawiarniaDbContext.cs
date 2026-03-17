@@ -8,5 +8,6 @@ namespace RezerwacjeKawiarnia.Api.Data
         public KawiarniaDbContext(DbContextOptions<KawiarniaDbContext> options) : base(options) { }
 
         public DbSet<Stolik> Stoliki { get; set; }
+        public DbSet<Rezerwacja> Rezerwacje { get; set; }
     }
 }
