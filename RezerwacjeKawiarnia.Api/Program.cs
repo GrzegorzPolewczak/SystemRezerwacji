@@ -39,6 +39,18 @@ using (var scope = app.Services.CreateScope())
         {
             Console.WriteLine($"Próba po³¹czenia z baz¹ ({i}/{maxProby})...");
             dbContext.Database.Migrate();
+
+            if (!dbContext.Stoliki.Any())
+            {
+                Console.WriteLine("Baza jest pusta. Dodajê testowe stoliki...");
+                dbContext.Stoliki.AddRange(
+                    new RezerwacjeKawiarnia.Api.Entities.Stolik { Numer = 1, LiczbaMiejsc = 2, CzyZarezerwowany = false },
+                    new RezerwacjeKawiarnia.Api.Entities.Stolik { Numer = 2, LiczbaMiejsc = 4, CzyZarezerwowany = false },
+                    new RezerwacjeKawiarnia.Api.Entities.Stolik { Numer = 3, LiczbaMiejsc = 6, CzyZarezerwowany = false }
+                );
+                dbContext.SaveChanges();
+            }
+
             Console.WriteLine("Migracje zakoñczone sukcesem!");
             break;
         }
