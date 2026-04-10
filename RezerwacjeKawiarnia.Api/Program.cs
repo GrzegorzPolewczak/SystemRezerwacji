@@ -28,6 +28,29 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<KawiarniaDbContext>();
+
+    int maxProby = 5;
+    for (int i = 1; i <= maxProby; i++)
+    {
+        try
+        {
+            Console.WriteLine($"Próba po³¹czenia z baz¹ ({i}/{maxProby})...");
+            dbContext.Database.Migrate();
+            Console.WriteLine("Migracje zakoñczone sukcesem!");
+            break;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Baza jeszcze nie wsta³a. Czekam 3 sekundy... B³¹d: {ex.Message}");
+            if (i == maxProby) throw;
+            System.Threading.Thread.Sleep(3000);
+        }
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

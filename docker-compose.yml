@@ -9,3 +9,24 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=${DB_PASSWORD}
+  api:
+    build: 
+      context: .
+      dockerfile: RezerwacjeKawiarnia.Api/Dockerfile
+    container_name: kawiarnia-api
+    ports:
+      - "7123:8080"
+    environment:
+      - ConnectionStrings__BazaKawiarni=Server=baza-danych;Database=KawiarniaDB;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - baza-danych
+  frontend:
+    build: 
+      context: ./kawiarnia-frontend 
+      dockerfile: Dockerfile
+    container_name: kawiarnia-ui
+    ports:
+      - "5173:80"
+    depends_on:
+      - api

@@ -22,6 +22,8 @@ const Menu = () => (
 );
 
 const Rezerwacje = () => {
+    const API_URL = 'http://localhost:7123/api';
+
     const [stoliki, setStoliki] = useState([]);
     const [rezerwacje, setRezerwacje] = useState([]);
 
@@ -37,8 +39,8 @@ const Rezerwacje = () => {
     useEffect(() => {
         const pobierzDane = async () => {
             try {
-                const odpStoliki = await axios.get('https://localhost:7132/api/Stoliki');
-                const odpRezerwacje = await axios.get('https://localhost:7132/api/Rezerwacje');
+                const odpStoliki = await axios.get(`${API_URL}/Stoliki`);
+                const odpRezerwacje = await axios.get(`${API_URL}/Rezerwacje`);
                 setStoliki(odpStoliki.data);
                 setRezerwacje(odpRezerwacje.data);
             } catch (error) {
@@ -61,13 +63,13 @@ const Rezerwacje = () => {
         };
 
         try { 
-            await axios.post(`https://localhost:7132/api/Rezerwacje`, nowaRezerwacja);
+            await axios.post(`${API_URL}/Rezerwacje`, nowaRezerwacja);
 
             setCzyBlad(false);
             setKomunikat("Stolik został pomyślnie zarezerwowany! 🎉");
             setImie(''); setNazwisko(''); setDataOd(''); setDataDo('');
 
-            const odpRezerwacje = await axios.get('https://localhost:7132/api/Rezerwacje');
+            const odpRezerwacje = await axios.get(`${API_URL}/Rezerwacje`);
             setRezerwacje(odpRezerwacje.data);
         } catch (error) {
             setCzyBlad(true);
@@ -188,80 +190,212 @@ const Rezerwacje = () => {
 };
 
 const PanelPracownika = () => {
+    const API_URL = 'http://localhost:7123/api';
+
+    const [widok, setWidok] = useState('rezerwacje');
     const [rezerwacje, setRezerwacje] = useState([]);
-    const [ladowanie, setLadowanie] = useState(true);
-    const [blad, setBlad] = useState(null);
+    const [stoliki, setStoliki] = useState([]);
+
+    const [edytowanaRezerwacja, setEdytowanaRezerwacja] = useState(null);
+    const [edytowanyStolik, setEdytowanyStolik] = useState(null);
+
+    const [nowyStolik, setNowyStolik] = useState({ numer: '', liczbaMiejsc: '' });
 
     useEffect(() => {
-        const pobierzDane = async () => {
-            try {
-                const odpowiedz = await axios.get(`https://localhost:7132/api/Rezerwacje`);
-
-                setRezerwacje(odpowiedz.data)
-                setLadowanie(false);
-            } catch (error) {
-                console.error(error);
-                setBlad("Nie udało się pobrać danych.");
-                setLadowanie(false);
-            }
-
-        };
         pobierzDane();
     }, []);
 
-    const usunRezerwacje = async (id) => {
-        if (!window.confirm("Czy na pewno chcesz odwołać tę rezerwację?")) return;
-
+    const pobierzDane = async () => {
         try {
-            await axios.delete(`https://localhost:7132/api/Rezerwacje/${id}`);
-
-            setRezerwacje(rezerwacje.filter(rez => rez.id !== id));
+            const [odpRezerwacje, odpStoliki] = await Promise.all([
+                axios.get(`${API_URL}/Rezerwacje`),
+                axios.get(`${API_URL}/Stoliki`)
+            ]);
+            setRezerwacje(odpRezerwacje.data);
+            setStoliki(odpStoliki.data);
         } catch (error) {
-            console.error("Błąd podczas usuwania: ", error);
-            alert("Wystąpił błąd. Nie udało się usunąć rezerwacji ze wględu na błąd serwera.");
+            alert("Błąd pobierania danych z serwera!");
         }
     };
 
-    if (ladowanie) return <div>Ładowanie danych...</div>;
-    if (blad) return <div style={{ color: 'red' }}>{blad}</div>;
+    const usunRezerwacje = async (id) => {
+        if (!window.confirm("Usunąć rezerwację?")) return;
+        try {
+            await axios.delete(`${API_URL}/Rezerwacje/${id}`);
+            setRezerwacje(rezerwacje.filter(r => r.id !== id));
+        } catch (error) { alert("Błąd usuwania!"); }
+    };
+
+    const zapiszEdycjeRezerwacji = async () => {
+        try {
+            const dto = {
+                imie: edytowanaRezerwacja.imie,
+                nazwisko: edytowanaRezerwacja.nazwisko,
+                dataOd: edytowanaRezerwacja.dataOd,
+                dataDo: edytowanaRezerwacja.dataDo,
+                stolikId: edytowanaRezerwacja.stolikId
+            };
+            await axios.put(`${API_URL}/Rezerwacje/${edytowanaRezerwacja.id}`, dto);
+            setEdytowanaRezerwacja(null);
+            pobierzDane();
+            alert("Zaktualizowano rezerwację!");
+        } catch (error) {
+            alert(error.response?.data || "Błąd edycji");
+        }
+    };
+
+    const dodajStolik = async (e) => {
+        e.preventDefault();
+
+        const wpisanyNumer = parseInt(nowyStolik.numer);
+
+        const czyNumerIstnieje = stoliki.some(s => s.numer === wpisanyNumer);
+        if (czyNumerIstnieje) {
+            alert(`Błąd: Stolik z numerem ${wpisanyNumer} już istnieje w kawiarni!`);
+            return;
+        }
+
+        try {
+            const dto = { numer: wpisanyNumer, liczbaMiejsc: parseInt(nowyStolik.liczbaMiejsc), czyZarezerwowany: false };
+            await axios.post(`${API_URL}/Stoliki`, dto);
+            setNowyStolik({ numer: '', liczbaMiejsc: '' });
+            pobierzDane();
+        } catch (error) { alert("Błąd podczas dodawania stolika."); }
+    };
+
+    const usunStolik = async (id) => {
+        if (!window.confirm("Usunąć stolik? UWAGA: Spowoduje to błąd, jeśli są do niego przypisane rezerwacje!")) return;
+        try {
+            await axios.delete(`${API_URL}/Stoliki/${id}`);
+            setStoliki(stoliki.filter(s => s.id !== id));
+        } catch (error) { alert("Nie można usunąć stolika. Prawdopodobnie ma przypisane rezerwacje w bazie."); }
+    };
+
+    const zapiszEdycjeStolika = async () => {
+        const wpisanyNumer = parseInt(edytowanyStolik.numer);
+
+        const czyNumerIstnieje = stoliki.some(s => s.numer === wpisanyNumer && s.id !== edytowanyStolik.id);
+        if (czyNumerIstnieje) {
+            alert(`Błąd: Nie możesz zmienić numeru na ${wpisanyNumer}, bo taki stolik już istnieje!`);
+            return;
+        }
+
+        try {
+            const dto = { numer: wpisanyNumer, liczbaMiejsc: parseInt(edytowanyStolik.liczbaMiejsc), czyZarezerwowany: edytowanyStolik.czyZarezerwowany };
+            await axios.put(`${API_URL}/Stoliki/${edytowanyStolik.id}`, dto);
+            setEdytowanyStolik(null);
+            pobierzDane();
+        } catch (error) { alert("Błąd edycji stolika."); }
+    };
+
+    const tableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '10px', backgroundColor: 'white' };
+    const thStyle = { padding: '10px', textAlign: 'left', backgroundColor: '#f4f4f4', borderBottom: '2px solid #ddd' };
+    const tdStyle = { padding: '10px', borderBottom: '1px solid #ddd' };
+    const inputStyle = { width: '90%', padding: '5px' };
 
     return (
         <div>
-            <h2 style={{ color: '#d9534f' }}>Panel Zarządzania Rezerwacjami</h2>
+            <h2 style={{ color: '#d9534f' }}>Panel Administracyjny</h2>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px', backgroundColor: 'white' }}>
-                <thead>
-                    <tr style={{ backgroundColor: '#f4f4f4', borderBottom: '2px solid #ddd' }}>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>ID</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Klient</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Nr Stolika</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Od</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>Do</th>
+            <div style={{ marginBottom: '20px' }}>
+                <button
+                    onClick={() => setWidok('rezerwacje')}
+                    style={{ padding: '10px 20px', backgroundColor: widok === 'rezerwacje' ? '#333' : '#ddd', color: widok === 'rezerwacje' ? 'white' : 'black', border: 'none', cursor: 'pointer', marginRight: '10px', borderRadius: '4px' }}>
+                    Zarządzaj Rezerwacjami
+                </button>
+                <button
+                    onClick={() => setWidok('stoliki')}
+                    style={{ padding: '10px 20px', backgroundColor: widok === 'stoliki' ? '#333' : '#ddd', color: widok === 'stoliki' ? 'white' : 'black', border: 'none', cursor: 'pointer', borderRadius: '4px' }}>
+                    Zarządzaj Stolikami
+                </button>
+            </div>
 
-                        <th style={{ padding: '10px', textAlign: 'center' }}>Akcje</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rezerwacje.map((rez) => (
-                        <tr key={rez.id} style={{ borderBottom: '1px solid #ddd' }}>
-                            <td style={{ padding: '10px' }}>{rez.id}</td>
-                            <td style={{ padding: '10px' }}>{rez.imie} {rez.nazwisko}</td>
-                            <td style={{ padding: '10px' }}>{rez.numerStolika}</td>
-                            <td style={{ padding: '10px' }}>{new Date(rez.dataOd).toLocaleString()}</td>
-                            <td style={{ padding: '10px' }}>{new Date(rez.dataDo).toLocaleString()}</td>
-
-                            <td style={{ padding: '10px', textAlign: 'center' }}>
-                                <button
-                                    onClick={() => usunRezerwacje(rez.id)}
-                                    style={{ backgroundColor: '#d9534f', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
-                                >
-                                    Usuń
-                                </button>
-                            </td>
+            {widok === 'rezerwacje' && (
+                <table style={tableStyle}>
+                    <thead>
+                        <tr>
+                            <th style={thStyle}>ID</th><th style={thStyle}>Imię</th><th style={thStyle}>Nazwisko</th><th style={thStyle}>Stolik (ID)</th><th style={thStyle}>Od</th><th style={thStyle}>Do</th><th style={thStyle}>Akcje</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {rezerwacje.map(rez => (
+                            edytowanaRezerwacja?.id === rez.id ? (
+                                <tr key={rez.id} style={{ backgroundColor: '#fffccc' }}>
+                                    <td style={tdStyle}>{rez.id}</td>
+                                    <td style={tdStyle}><input style={inputStyle} value={edytowanaRezerwacja.imie} onChange={e => setEdytowanaRezerwacja({ ...edytowanaRezerwacja, imie: e.target.value })} /></td>
+                                    <td style={tdStyle}><input style={inputStyle} value={edytowanaRezerwacja.nazwisko} onChange={e => setEdytowanaRezerwacja({ ...edytowanaRezerwacja, nazwisko: e.target.value })} /></td>
+                                    <td style={tdStyle}><input type="number" style={inputStyle} value={edytowanaRezerwacja.stolikId} onChange={e => setEdytowanaRezerwacja({ ...edytowanaRezerwacja, stolikId: e.target.value })} /></td>
+                                    <td style={tdStyle}><input type="datetime-local" style={inputStyle} value={edytowanaRezerwacja.dataOd.slice(0, 16)} onChange={e => setEdytowanaRezerwacja({ ...edytowanaRezerwacja, dataOd: e.target.value })} /></td>
+                                    <td style={tdStyle}><input type="datetime-local" style={inputStyle} value={edytowanaRezerwacja.dataDo.slice(0, 16)} onChange={e => setEdytowanaRezerwacja({ ...edytowanaRezerwacja, dataDo: e.target.value })} /></td>
+                                    <td style={tdStyle}>
+                                        <button onClick={zapiszEdycjeRezerwacji} style={{ backgroundColor: '#5cb85c', color: 'white', marginRight: '5px', padding: '5px', cursor: 'pointer', border: 'none' }}>Zapisz</button>
+                                        <button onClick={() => setEdytowanaRezerwacja(null)} style={{ backgroundColor: '#aaa', color: 'white', padding: '5px', cursor: 'pointer', border: 'none' }}>Anuluj</button>
+                                    </td>
+                                </tr>
+                            ) : (
+                                <tr key={rez.id}>
+                                    <td style={tdStyle}>{rez.id}</td>
+                                    <td style={tdStyle}>{rez.imie}</td>
+                                    <td style={tdStyle}>{rez.nazwisko}</td>
+                                    <td style={tdStyle}>Nr {rez.numerStolika} (ID:{rez.stolikId})</td>
+                                    <td style={tdStyle}>{new Date(rez.dataOd).toLocaleString()}</td>
+                                    <td style={tdStyle}>{new Date(rez.dataDo).toLocaleString()}</td>
+                                    <td style={tdStyle}>
+                                        <button onClick={() => setEdytowanaRezerwacja(rez)} style={{ backgroundColor: '#f0ad4e', color: 'white', marginRight: '5px', padding: '5px', cursor: 'pointer', border: 'none' }}>Edytuj</button>
+                                        <button onClick={() => usunRezerwacje(rez.id)} style={{ backgroundColor: '#d9534f', color: 'white', padding: '5px', cursor: 'pointer', border: 'none' }}>Usuń</button>
+                                    </td>
+                                </tr>
+                            )
+                        ))}
+                    </tbody>
+                </table>
+            )}
+
+            {widok === 'stoliki' && (
+                <div>
+                    <div style={{ backgroundColor: '#f9f9f9', padding: '15px', marginBottom: '20px', border: '1px solid #ddd' }}>
+                        <h4 style={{ margin: '0 0 10px 0' }}>Dodaj nowy stolik:</h4>
+                        <form onSubmit={dodajStolik} style={{ display: 'flex', gap: '10px' }}>
+                            <input type="number" placeholder="Numer stolika" required value={nowyStolik.numer} onChange={e => setNowyStolik({ ...nowyStolik, numer: e.target.value })} style={{ padding: '8px' }} />
+                            <input type="number" placeholder="Liczba miejsc" required value={nowyStolik.liczbaMiejsc} onChange={e => setNowyStolik({ ...nowyStolik, liczbaMiejsc: e.target.value })} style={{ padding: '8px' }} />
+                            <button type="submit" style={{ backgroundColor: '#4CAF50', color: 'white', padding: '8px 15px', border: 'none', cursor: 'pointer' }}>+ Dodaj</button>
+                        </form>
+                    </div>
+
+                    <table style={tableStyle}>
+                        <thead>
+                            <tr>
+                                <th style={thStyle}>ID</th><th style={thStyle}>Numer</th><th style={thStyle}>Miejsca</th><th style={thStyle}>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {stoliki.map(stolik => (
+                                edytowanyStolik?.id === stolik.id ? (
+                                    <tr key={stolik.id} style={{ backgroundColor: '#fffccc' }}>
+                                        <td style={tdStyle}>{stolik.id}</td>
+                                        <td style={tdStyle}><input type="number" style={inputStyle} value={edytowanyStolik.numer} onChange={e => setEdytowanyStolik({ ...edytowanyStolik, numer: e.target.value })} /></td>
+                                        <td style={tdStyle}><input type="number" style={inputStyle} value={edytowanyStolik.liczbaMiejsc} onChange={e => setEdytowanyStolik({ ...edytowanyStolik, liczbaMiejsc: e.target.value })} /></td>
+                                        <td style={tdStyle}>
+                                            <button onClick={zapiszEdycjeStolika} style={{ backgroundColor: '#5cb85c', color: 'white', marginRight: '5px', padding: '5px', cursor: 'pointer', border: 'none' }}>Zapisz</button>
+                                            <button onClick={() => setEdytowanyStolik(null)} style={{ backgroundColor: '#aaa', color: 'white', padding: '5px', cursor: 'pointer', border: 'none' }}>Anuluj</button>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <tr key={stolik.id}>
+                                        <td style={tdStyle}>{stolik.id}</td>
+                                        <td style={tdStyle}>Stolik nr {stolik.numer}</td>
+                                        <td style={tdStyle}>{stolik.liczbaMiejsc} os.</td>
+                                        <td style={tdStyle}>
+                                            <button onClick={() => setEdytowanyStolik(stolik)} style={{ backgroundColor: '#f0ad4e', color: 'white', marginRight: '5px', padding: '5px', cursor: 'pointer', border: 'none' }}>Edytuj</button>
+                                            <button onClick={() => usunStolik(stolik.id)} style={{ backgroundColor: '#d9534f', color: 'white', padding: '5px', cursor: 'pointer', border: 'none' }}>Usuń</button>
+                                        </td>
+                                    </tr>
+                                )
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };

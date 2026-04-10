@@ -54,6 +54,12 @@ namespace RezerwacjeKawiarnia.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<StolikDto>> DodajStolik(DodajStolikDto dto)
         {
+            var czyIstnieje = await _context.Stoliki.AnyAsync(s => s.Numer == dto.Numer);
+            if (czyIstnieje)
+            {
+                return Conflict($"Stolik o numerze {dto.Numer} już istnieje.");
+            }
+
             var nowyStolik = new Stolik
             {
                 Numer = dto.Numer,
@@ -82,6 +88,12 @@ namespace RezerwacjeKawiarnia.Api.Controllers
             if (stolik == null)
             {
                 return NotFound($"Nie znaleziono stolika o ID {id}.");
+            }
+
+            var czyIstnieje = await _context.Stoliki.AnyAsync(s => s.Numer == dto.Numer);
+            if(czyIstnieje)
+            {
+                return Conflict($"Stolik o numerze {dto.Numer} już istnieje.");
             }
 
             stolik.Numer = dto.Numer;
